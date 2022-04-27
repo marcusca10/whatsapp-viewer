@@ -24,10 +24,10 @@ WhatsappDatabase::~WhatsappDatabase()
 void WhatsappDatabase::validate()
 {
 	if (!hasTable("message_thumbnails")
-		|| !hasTable("messages_quotes")
-		|| !hasTable("messages_links")
-		|| !hasColumn("messages", "quoted_row_id")
-		|| !hasColumn("messages", "media_caption"))
+		|| !hasTable("message_quoted")
+		|| !hasTable("message_link")
+		|| !hasColumn("message_view", "quoted_row_id")
+		|| !hasColumn("message_view", "media_caption"))
 	{
 		throw Exception("It seems like you tried to open an older WhatsApp database. Please try to use an older version of WhatsApp Viewer.");
 	}
@@ -35,12 +35,18 @@ void WhatsappDatabase::validate()
 
 void WhatsappDatabase::getChats(Settings &settings, std::vector<WhatsappChat*> &chats)
 {
-	const char *query = "SELECT chat_view.raw_string_jid, chat_view.subject, chat_view.created_timestamp, max(messages.timestamp) " \
+	//const char *query = "SELECT chat_view.raw_string_jid, chat_view.subject, chat_view.created_timestamp, max(messages.timestamp) " \
+	//					"FROM chat_view " \
+	//					"LEFT OUTER JOIN messages on messages.key_remote_jid = chat_view.raw_string_jid " \
+	//					"WHERE chat_view.hidden = 0 "\
+	//					"GROUP BY chat_view.raw_string_jid, chat_view.subject, chat_view.created_timestamp " \
+	//					"ORDER BY max(messages.timestamp) desc";
+	const char *query = "SELECT chat_view.raw_string_jid, chat_view.subject, chat_view.created_timestamp, max(message_view.timestamp) " \
 						"FROM chat_view " \
-						"LEFT OUTER JOIN messages on messages.key_remote_jid = chat_view.raw_string_jid " \
+						"LEFT OUTER JOIN message_view on message_view.chat_row_id = chat_view._id " \
 						"WHERE chat_view.hidden = 0 "\
 						"GROUP BY chat_view.raw_string_jid, chat_view.subject, chat_view.created_timestamp " \
-						"ORDER BY max(messages.timestamp) desc";
+						"ORDER BY max(message_view.timestamp) desc";
 
 	sqlite3_stmt *res;
 	if (sqlite3_prepare_v2(database.getHandle(), query, -1, &res, NULL) != SQLITE_OK)
@@ -68,7 +74,7 @@ void WhatsappDatabase::getChats(Settings &settings, std::vector<WhatsappChat*> &
 
 int WhatsappDatabase::messagesCount(const std::string &chatId, int fromMe)
 {
-	const char *query = "SELECT count(_id) from messages where key_remote_jid = ? and key_from_me = ?";
+	const char *query = "SELECT count(_id) from message_view where chat_row_id = ? and from_me = ?";
 
 	sqlite3_stmt *res;
 	if (sqlite3_prepare_v2(database.getHandle(), query, -1, &res, NULL) != SQLITE_OK)
